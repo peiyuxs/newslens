@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
-  const { source, apiKey: clientApiKey } = await request.json();
+  const { query, apiKey: clientApiKey } = await request.json();
   const apiKey = clientApiKey || process.env.ZHIPU_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json({ error: "尚未提供 API Key，请在页面上输入。" }, { status: 400 });
+    return NextResponse.json({ error: "API Key not provided. Please check .env configuration." }, { status: 400 });
   }
+
+  // Default to global headlines if no query provided
+  const searchQuery = query && query.trim() ? query.trim() : "top and most popular global headlines from major news sources like CNN, BBC, Reuters, Associated Press, and other reliable sources";
 
   try {
     const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
@@ -16,19 +19,17 @@ export async function POST(request) {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "glm-4-flash", // 使用 flash 模型保证响应速度
+        model: "glm-4-flash", // Using flash model to ensure response speed
         messages: [
           {
             role: "system",
-            content: "你是一个新闻摘要助手，专门为视力障碍人士提供服务。请根据用户提供的媒体源（如CNN, BBC, DW），搜索并列举该媒体当前最热门的3条新闻内容，并为每条新闻提供一句话的简洁摘要。回复语言为英文。请直接开始总结，不要有开场白。"
+            content: "You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 current news items related to that query, and provide a concise one-sentence summary for each news item. Reply in English. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources."
           },
           {
             role: "user",
-            content: `请总结来自 ${source} 的最热门新闻。`
+            content: `Please find and summarize the top 3 news articles about: ${searchQuery}`
           }
         ],
-        // 如果 ZhipuAI 支持内置搜索，通常在 tools 中配置
-        // 这里假设模型能通过内置能力获取信息，或者提供它所知道的最新信息
       }),
     });
 
