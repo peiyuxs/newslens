@@ -1,15 +1,70 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import useLocalStorage from './localstorage';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [contrastMode, setContrastMode] = useState("normal");
-  const [textSize, setTextSize] = useState("normal");
   const [showSettings, setShowSettings] = useState(false);
+
+  const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
+  const { storedValue: storedStories, setValue: setStoredStories } = useLocalStorage('news-stories', []);
+  const { storedValue: contrastMode, setValue: setContrastMode, isLoaded: contrastLoaded } = useLocalStorage('contrastMode', "normal");
+  const { storedValue: textSize, setValue: setTextSize, isLoaded: textSizeLoaded } = useLocalStorage('textSize', "normal");
+  const [settingsReady, setSettingsReady] = useState(false);
+
+  // Wait for both settings to load before rendering
+  useEffect(() => {
+    if (contrastLoaded && textSizeLoaded) {
+      setSettingsReady(true);
+    }
+  }, [contrastLoaded, textSizeLoaded]);
+
+  // Extract story titles from the API result (first few words of each story)
+  const extractStoryTitles = (resultText) => {
+    const stories = [];
+    const lines = resultText.split('\n').filter(line => line.trim());
+    
+    for (const line of lines) {
+      // Extract the first 50 characters as a unique identifier
+      const title = line.trim().substring(0, 50);
+      if (title.length > 0) {
+        stories.push(title);
+      }
+    }
+    return stories;
+  };
+
+  // Add stories to localStorage with size management (max 50 stories)
+  const addStoriesToStorage = (newStories) => {
+    const MAX_STORIES = 50;
+    const currentStories = Array.isArray(storedStories) ? storedStories : [];
+    
+    const storiesWithTimestamp = newStories.map(story => ({
+      title: story,
+      timestamp: new Date().getTime()
+    }));
+    
+    let combined = [...currentStories, ...storiesWithTimestamp];
+    
+    // If we exceed the limit, remove oldest stories first
+    if (combined.length > MAX_STORIES) {
+      combined = combined
+        .sort((a, b) => b.timestamp - a.timestamp) // Sort newest first
+        .slice(0, MAX_STORIES); // Keep only newest MAX_STORIES
+    }
+    
+    setStoredStories(combined);
+  };
+
+  // Get previous story titles for deduplication
+  const getPreviousStoryTitles = () => {
+    const currentStories = Array.isArray(storedStories) ? storedStories : [];
+    return currentStories.map(story => story.title || story);
+  };
 
   // Load API key from environment on component mount
   useEffect(() => {
@@ -42,12 +97,17 @@ export default function Home() {
     speak(`Fetching news about: ${displayQuery}. Please wait.`);
 
     try {
+      const previousStories = getPreviousStoryTitles();
       const response = await fetch("/api/summarize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: searchQuery, apiKey }),
+        body: JSON.stringify({ 
+          query: searchQuery, 
+          apiKey,
+          previousStories: previousStories
+        }),
       });
 
       const data = await response.json();
@@ -58,6 +118,18 @@ export default function Home() {
 
       const result = data.result;
       setSummary(result);
+      
+      // Extract and store story titles for deduplication
+      const newStories = extractStoryTitles(result);
+      addStoriesToStorage(newStories);
+      
+      // Store summary in history
+      addItem({
+        query: searchQuery || 'global headlines',
+        result: result,
+        timestamp: new Date().toISOString()
+      });
+      
       setLoading(false);
       speak("Summary complete. " + result);
     } catch (error) {
@@ -116,6 +188,15 @@ export default function Home() {
   };
 
   const contrastStyles = getContrastStyles();
+
+  // Don't render until settings are loaded from localStorage
+  if (!settingsReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-zinc-900">
+        <p className="text-white text-2xl">Loading settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col items-center justify-center min-h-screen ${contrastStyles.bgClass} p-8 font-sans ${contrastStyles.textClass}`}>
