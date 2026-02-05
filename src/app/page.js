@@ -1,25 +1,45 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState("");
-  const [source, setSource] = useState("BBC");
+  const [searchQuery, setSearchQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [contrastMode, setContrastMode] = useState("normal");
+  const [textSize, setTextSize] = useState("normal");
+  const [showSettings, setShowSettings] = useState(false);
 
-  // 调用后端 API 获取新闻并总结
+  // Load API key from environment on component mount
+  useEffect(() => {
+    const loadApiKey = async () => {
+      try {
+        const response = await fetch("/api/get-api-key");
+        const data = await response.json();
+        if (data.apiKey) {
+          setApiKey(data.apiKey);
+        }
+      } catch (error) {
+        console.error("Failed to load API key:", error);
+      }
+    };
+    loadApiKey();
+  }, []);
+
+  // Call backend API to fetch and summarize news
   const fetchAndSummarize = async () => {
     if (!apiKey) {
-      const msg = "请先输入您的 API Key 再进行测试。";
+      const msg = "API Key not loaded. Please check your .env file configuration.";
       setSummary(msg);
       speak(msg);
       return;
     }
 
     setLoading(true);
-    setSummary("Give me the latest American sports article from "+ source+ ".");
-    speak("正在获取 " + source + " 的热门新闻并为您总结。请稍候。");
+    const displayQuery = searchQuery.trim() || "top and most popular global headlines from major news sources";
+    setSummary(`Fetching news about: ${displayQuery}. Please wait.`);
+    speak(`Fetching news about: ${displayQuery}. Please wait.`);
 
     try {
       const response = await fetch("/api/summarize", {
@@ -27,7 +47,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ source, apiKey }),
+        body: JSON.stringify({ query: searchQuery, apiKey }),
       });
 
       const data = await response.json();
@@ -39,90 +59,203 @@ export default function Home() {
       const result = data.result;
       setSummary(result);
       setLoading(false);
-      speak("总结完毕。" + result);
+      speak("Summary complete. " + result);
     } catch (error) {
       console.error("Error fetching summary:", error);
-      const errorMsg = "抱歉，由于 API 未配置或网络问题，获取新闻失败。";
+      const errorMsg = "Sorry, failed to fetch news due to API misconfiguration or network issues.";
       setSummary(errorMsg);
       speak(errorMsg);
       setLoading(false);
     }
   };
 
-  // 文字转语音函数 (使用浏览器自带 API)
+  // Text-to-speech function (using built-in browser API)
   const speak = (text) => {
     if (typeof window !== "undefined" && window.speechSynthesis) {
-      // 先停止之前的播放
+      // Stop previous playback first
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "zh-CN";
+      utterance.lang = "en-US";
       window.speechSynthesis.speak(utterance);
     }
   };
 
+  // Get contrast mode styles
+  const getContrastStyles = () => {
+    if (contrastMode === "high") {
+      return {
+        bgClass: "bg-black",
+        textClass: "text-white",
+        borderClass: "border-white",
+        accentClass: "bg-yellow-300 text-black",
+      };
+    } else if (contrastMode === "dark") {
+      return {
+        bgClass: "bg-slate-950",
+        textClass: "text-slate-100",
+        borderClass: "border-slate-300",
+        accentClass: "bg-blue-600",
+      };
+    }
+    return {
+      bgClass: "bg-zinc-900",
+      textClass: "text-white",
+      borderClass: "border-zinc-700",
+      accentClass: "bg-emerald-500 hover:bg-emerald-400",
+    };
+  };
+
+  // Get text size multiplier
+  const getTextSizeClass = (baseSize) => {
+    if (textSize === "large") {
+      return `text-[${parseInt(baseSize.replace("text-", "").replace("xl", "4")) * 1.3}xl]`;
+    } else if (textSize === "small") {
+      return `text-[${parseInt(baseSize.replace("text-", "").replace("xl", "4")) * 0.8}xl]`;
+    }
+    return baseSize;
+  };
+
+  const contrastStyles = getContrastStyles();
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-900 p-8 font-sans text-white">
-      <main className="w-full max-w-2xl bg-zinc-800 rounded-3xl p-10 shadow-2xl border border-zinc-700">
+    <div className={`flex flex-col items-center justify-center min-h-screen ${contrastStyles.bgClass} p-8 font-sans ${contrastStyles.textClass}`}>
+      <main className={`w-full max-w-2xl ${contrastMode === "high" ? "bg-white text-black" : contrastStyles.bgClass} rounded-3xl p-10 shadow-2xl border-4 ${contrastStyles.borderClass}`}>
+        {/* Settings button */}
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className={`absolute top-4 right-4 p-3 rounded-full ${contrastStyles.accentClass} font-bold text-lg`}
+          aria-label="Toggle accessibility settings"
+        >
+          ⚙️ Accessibility
+        </button>
+
+        {/* Accessibility Settings Panel */}
+        {showSettings && (
+          <div className={`mb-8 p-6 rounded-xl border-4 ${contrastStyles.borderClass} ${contrastMode === "high" ? "bg-yellow-100 text-black" : "bg-zinc-700"}`}>
+            <h3 className="text-2xl font-bold mb-4">Accessibility Settings</h3>
+            
+            {/* Contrast Mode */}
+            <div className="mb-6">
+              <label className="block font-bold mb-2">Contrast Mode:</label>
+              <div className="space-y-2">
+                {["normal", "high", "dark"].map((mode) => (
+                  <label key={mode} className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="contrast"
+                      value={mode}
+                      checked={contrastMode === mode}
+                      onChange={(e) => setContrastMode(e.target.value)}
+                      className="w-4 h-4 mr-3"
+                    />
+                    <span className="capitalize text-lg">{mode} Contrast</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Text Size */}
+            <div className="mb-6">
+              <label className="block font-bold mb-2">Text Size:</label>
+              <div className="space-y-2">
+                {["small", "normal", "large"].map((size) => (
+                  <label key={size} className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="textsize"
+                      value={size}
+                      checked={textSize === size}
+                      onChange={(e) => setTextSize(e.target.value)}
+                      className="w-4 h-4 mr-3"
+                    />
+                    <span className="capitalize text-lg">{size === "small" ? "Small" : size === "large" ? "Large" : "Normal"} Text</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowSettings(false)}
+              className={`w-full py-3 rounded-xl font-bold text-lg ${contrastStyles.accentClass}`}
+            >
+              Close Settings
+            </button>
+          </div>
+        )}
+
         <header className="text-center mb-10">
-          <h1 className="text-4xl font-bold tracking-tight mb-2">NewsLens 总结助手</h1>
-          <p className="text-zinc-400 text-lg">专为视力障碍人士设计的语音新闻助手</p>
+          <h1 className={`font-bold tracking-tight mb-2 ${textSize === "large" ? "text-5xl" : textSize === "small" ? "text-3xl" : "text-4xl"}`}>NewsLens Summary Assistant</h1>
+          <p className={`${textSize === "large" ? "text-xl" : textSize === "small" ? "text-base" : "text-lg"}`}>Voice news assistant designed for people with visual impairments</p>
         </header>
 
-        {/* API Key 输入框 */}
+        {/* API Key input removed - now loaded from .env file */}
+
+        {/* Search/Prompt Input Bar */}
         <div className="mb-8">
-          <label className="block text-zinc-500 text-sm font-bold mb-2 uppercase">
-            设置 AI 密钥 (API Key)
+          <label className="block font-bold mb-3 uppercase">
+            Search for News:
           </label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="粘贴您的智谱 AI API Key"
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-3 px-4 text-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && fetchAndSummarize()}
+              placeholder='Ask for news: e.g., "tech news", "BBC news", "latest sports", or leave blank for top global headlines'
+              className={`flex-1 rounded-xl py-3 px-4 font-bold text-lg focus:outline-none focus:ring-2 transition-all border-2 ${
+                contrastMode === "high"
+                  ? "bg-white text-black border-black focus:ring-yellow-400"
+                  : "bg-zinc-900 text-emerald-50 border-zinc-700 focus:ring-emerald-500"
+              }`}
+              aria-label="Search for news articles"
+            />
+          </div>
+          <p className={`text-sm mt-2 ${contrastMode === "high" ? "text-black" : "text-zinc-400"}`}>
+            Examples: "technology news", "BBC", "latest sports from ESPN", "weather news", or just press Enter for top global headlines
+          </p>
         </div>
 
-        {/* 来源选择 */}
+        {/* Source selection */}
         <div className="grid grid-cols-3 gap-4 mb-10">
           {["BBC", "CNN", "DW"].map((name) => (
             <button
               key={name}
               onClick={() => {
-                setSource(name);
-                speak("已选择 " + name);
+                setSearchQuery(name);
+                speak("Searching for " + name + " news");
               }}
-              className={`py-4 rounded-xl text-xl font-bold transition-all ${
-                source === name 
-                ? "bg-blue-600 ring-4 ring-blue-400" 
-                : "bg-zinc-700 hover:bg-zinc-600"
+              className={`py-4 rounded-xl text-xl font-bold transition-all border-2 ${
+                searchQuery === name 
+                ? contrastMode === "high" ? "bg-yellow-300 text-black border-black" : "bg-blue-600 ring-4 ring-blue-400 border-blue-400" 
+                : contrastMode === "high" ? "bg-white border-black text-black hover:bg-gray-200" : "bg-zinc-700 hover:bg-zinc-600 border-zinc-600"
               }`}
-              aria-label={`选择新闻源 ${name}`}
+              aria-label={`Quick search for ${name} news`}
             >
               {name}
             </button>
           ))}
         </div>
 
-        {/* 核心操作按钮 */}
+        {/* Core action button */}
         <button
           onClick={fetchAndSummarize}
           disabled={loading}
-          className={`w-full py-10 rounded-2xl text-3xl font-black shadow-lg transform transition-active active:scale-95 ${
-            loading ? "bg-zinc-600 cursor-not-allowed" : "bg-emerald-500 hover:bg-emerald-400"
+          className={`w-full py-10 rounded-2xl font-black shadow-lg transform transition-active active:scale-95 border-4 ${textSize === "large" ? "text-4xl" : textSize === "small" ? "text-2xl" : "text-3xl"} ${
+            loading ? "bg-zinc-600 cursor-not-allowed border-zinc-500" : contrastMode === "high" ? "bg-yellow-300 text-black border-black hover:bg-yellow-400" : `${contrastStyles.accentClass} border-emerald-400`
           }`}
-          aria-label="开始获取并阅读新闻总结"
+          aria-label="Start fetching and reading news summary"
         >
-          {loading ? "正在总结..." : "点击开始总结并朗读"}
+          {loading ? "Summarizing..." : "Click to summarize and read aloud"}
         </button>
 
-        {/* 结果显示区域 (高对比度) */}
-        <section className="mt-12 p-6 bg-black rounded-xl border-l-8 border-emerald-500 min-h-[150px]">
-          <h2 className="text-zinc-500 text-sm uppercase font-bold mb-2">当前输出</h2>
-          <p className="text-2xl leading-relaxed text-emerald-50">{summary || "请点击上方按钮开始..."}</p>
+        {/* Result display area (high contrast) */}
+        <section className={`mt-12 p-6 rounded-xl border-l-8 min-h-[150px] border-4 ${contrastMode === "high" ? "bg-white text-black border-black border-l-yellow-400" : "bg-black border-emerald-500"}`}>
+          <h2 className={`text-sm uppercase font-bold mb-2 ${textSize === "large" ? "text-lg" : "text-sm"} ${contrastMode === "high" ? "text-black" : "text-zinc-500"}`}>Current Output</h2>
+          <p className={`leading-relaxed ${contrastMode === "high" ? "text-black" : "text-emerald-50"} ${textSize === "large" ? "text-3xl" : textSize === "small" ? "text-lg" : "text-2xl"}`}>{summary || "Click the button above to start..."}</p>
         </section>
 
-        <footer className="mt-8 text-center text-zinc-500 text-sm">
-          提示：本助手会自动使用语音为您朗读新闻摘要。
+        <footer className={`mt-8 text-center text-sm ${textSize === "large" ? "text-lg" : "text-sm"} ${contrastMode === "high" ? "text-black" : "text-zinc-500"}`}>
+          Tip: This assistant will automatically read news summaries aloud for you.
         </footer>
       </main>
     </div>
