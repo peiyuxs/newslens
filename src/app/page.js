@@ -1,21 +1,70 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getContrastStyles, getTextSizeClasses, getBgStyles } from "@/lib/styleHelpers";
-import { speak } from "@/lib/audioHelpers";
-import { fetchAPIKey, fetchAndSummarizeNews } from "@/lib/apiHelpers";
-import { ANIMATIONS_STYLES } from "@/lib/constants";
+import useLocalStorage from './localstorage';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [contrastMode, setContrastMode] = useState("normal");
-  const [textSize, setTextSize] = useState("normal");
   const [showSettings, setShowSettings] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [articles, setArticles] = useState([]);
+
+  const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
+  const { storedValue: storedStories, setValue: setStoredStories } = useLocalStorage('news-stories', []);
+  const { storedValue: contrastMode, setValue: setContrastMode, isLoaded: contrastLoaded } = useLocalStorage('contrastMode', "normal");
+  const { storedValue: textSize, setValue: setTextSize, isLoaded: textSizeLoaded } = useLocalStorage('textSize', "normal");
+  const [settingsReady, setSettingsReady] = useState(false);
+
+  // Wait for both settings to load before rendering
+  useEffect(() => {
+    if (contrastLoaded && textSizeLoaded) {
+      setSettingsReady(true);
+    }
+  }, [contrastLoaded, textSizeLoaded]);
+
+  // Extract story titles from the API result (first few words of each story)
+  const extractStoryTitles = (resultText) => {
+    const stories = [];
+    const lines = resultText.split('\n').filter(line => line.trim());
+    
+    for (const line of lines) {
+      // Extract the first 50 characters as a unique identifier
+      const title = line.trim().substring(0, 50);
+      if (title.length > 0) {
+        stories.push(title);
+      }
+    }
+    return stories;
+  };
+
+  // Add stories to localStorage with size management (max 50 stories)
+  const addStoriesToStorage = (newStories) => {
+    const MAX_STORIES = 50;
+    const currentStories = Array.isArray(storedStories) ? storedStories : [];
+    
+    const storiesWithTimestamp = newStories.map(story => ({
+      title: story,
+      timestamp: new Date().getTime()
+    }));
+    
+    let combined = [...currentStories, ...storiesWithTimestamp];
+    
+    // If we exceed the limit, remove oldest stories first
+    if (combined.length > MAX_STORIES) {
+      combined = combined
+        .sort((a, b) => b.timestamp - a.timestamp) // Sort newest first
+        .slice(0, MAX_STORIES); // Keep only newest MAX_STORIES
+    }
+    
+    setStoredStories(combined);
+  };
+
+  // Get previous story titles for deduplication
+  const getPreviousStoryTitles = () => {
+    const currentStories = Array.isArray(storedStories) ? storedStories : [];
+    return currentStories.map(story => story.title || story);
+  };
 
   // Load API key from environment on component mount
   useEffect(() => {
@@ -31,27 +80,111 @@ export default function Home() {
   // Call backend API to fetch and summarize news
   const handleFetchAndSummarize = async () => {
     setLoading(true);
-    await fetchAndSummarizeNews(
-      searchQuery,
-      apiKey,
-      setSummary,
-      speak,
-      (result) => {
-        setSummary(result);
-        setHasSearched(true);
-        setLoading(false);
-      },
-      (errorMsg) => {
-        setSummary(errorMsg);
-        setLoading(false);
-      },
-      speak
-    );
+    const displayQuery = searchQuery.trim() || "top and most popular global headlines from major news sources";
+    setSummary(`Fetching news about: ${displayQuery}. Please wait.`);
+    speak(`Fetching news about: ${displayQuery}. Please wait.`);
+
+    try {
+      const previousStories = getPreviousStoryTitles();
+      const response = await fetch("/api/summarize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          query: searchQuery, 
+          apiKey,
+          previousStories: previousStories
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const result = data.result;
+      setSummary(result);
+      
+      // Extract and store story titles for deduplication
+      const newStories = extractStoryTitles(result);
+      addStoriesToStorage(newStories);
+      
+      // Store summary in history
+      addItem({
+        query: searchQuery || 'global headlines',
+        result: result,
+        timestamp: new Date().toISOString()
+      });
+      
+      setLoading(false);
+      speak("Summary complete. " + result);
+    } catch (error) {
+      console.error("Error fetching summary:", error);
+      const errorMsg = "Sorry, failed to fetch news due to API misconfiguration or network issues.";
+      setSummary(errorMsg);
+      speak(errorMsg);
+      setLoading(false);
+    }
   };
 
-  // Get derived classes from imported helpers
-  const textSizeClasses = getTextSizeClasses(textSize);
-  const bgStyles = getBgStyles(contrastMode);
+  // Text-to-speech function (using built-in browser API)
+  const speak = (text) => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      // Stop previous playback first
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-US";
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Get contrast mode styles
+  const getContrastStyles = () => {
+    if (contrastMode === "high") {
+      return {
+        bgClass: "bg-black",
+        textClass: "text-white",
+        borderClass: "border-white",
+        accentClass: "bg-yellow-300 text-black",
+      };
+    } else if (contrastMode === "dark") {
+      return {
+        bgClass: "bg-slate-950",
+        textClass: "text-slate-100",
+        borderClass: "border-slate-300",
+        accentClass: "bg-blue-600",
+      };
+    }
+    return {
+      bgClass: "bg-zinc-900",
+      textClass: "text-white",
+      borderClass: "border-zinc-700",
+      accentClass: "bg-emerald-500 hover:bg-emerald-400",
+    };
+  };
+
+  // Get text size multiplier
+  const getTextSizeClass = (baseSize) => {
+    if (textSize === "large") {
+      return `text-[${parseInt(baseSize.replace("text-", "").replace("xl", "4")) * 1.3}xl]`;
+    } else if (textSize === "small") {
+      return `text-[${parseInt(baseSize.replace("text-", "").replace("xl", "4")) * 0.8}xl]`;
+    }
+    return baseSize;
+  };
+
+  const contrastStyles = getContrastStyles();
+
+  // Don't render until settings are loaded from localStorage
+  if (!settingsReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-zinc-900">
+        <p className="text-white text-2xl">Loading settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${bgStyles.bg} transition-colors duration-300`}>
