@@ -30,7 +30,7 @@ export async function POST(request) {
         messages: [
           {
             role: "system",
-            content: `You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 current news items related to that query, and provide a concise one-sentence summary for each news item. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources.\n\nReply in the language indicated by the BCP-47 tag: ${languageTag}.` + exclusionNote
+            content: `You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 latest news items related to that query, and provide a concise one-sentence summary for each news item. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources. Detect the query language and display results in the same language.` + exclusionNote
           },
           {
             role: "user",

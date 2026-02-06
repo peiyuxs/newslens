@@ -297,7 +297,7 @@ export default function Home() {
     }
 
     // Use a different lead-in to the headline so it doesn't sound like a replay
-    const leadIn = headline ? `Top story: ${headline}.` : '';
+    const leadIn = headline ? `${headline}.` : '';
     const spokenText = `${leadIn}${contentToRead ? ' ' + contentToRead : ''}`.trim();
 
     const u = new SpeechSynthesisUtterance(spokenText);
