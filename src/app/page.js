@@ -6,6 +6,7 @@ import { fetchAPIKey, fetchAndSummarizeNews } from '@/lib/apiHelpers';
 import { getContrastStyles, getTextSizeClasses, getBgStyles } from '@/lib/styleHelpers';
 import { getButtonClasses, getCardClasses, getSettingsPanelClasses, getInputClasses, getBackdropClasses, parseNewsSummary } from '@/lib/componentHelpers';
 import { ANIMATIONS_STYLES } from '@/lib/constants';
+import { SpeechToSearch } from '@/utils/speechToSearch';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -19,9 +20,12 @@ export default function Home() {
   const [articles, setArticles] = useState([]);
   const [showSummaryFade, setShowSummaryFade] = useState(false);
   const [newsCards, setNewsCards] = useState([]);
-  const [currentPlayingId, setCurrentPlayingId] = useState(null);
-  const [isPaused, setIsPaused] = useState(false);
-  const utteranceRef = useRef(null);
+  const [speechToSearch, setSpeechToSearch] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isWaitingForCommand, setIsWaitingForCommand] = useState(false);
+  const [recognizedText, setRecognizedText] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
   const { storedValue: savedNewsCards, setValue: setSavedNewsCards } = useLocalStorage('news-cards', []);
@@ -38,6 +42,103 @@ export default function Home() {
       setSettingsReady(true);
     }
   }, [contrastLoaded, textSizeLoaded, voiceLoaded]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined' && settingsReady) {
+      const speech = new SpeechToSearch(
+        // Search callback
+        async (transcript) => {
+          console.log('User command received:', transcript);
+          
+          // Immediately display user's speech in search box
+          setSearchQuery(transcript);
+          
+          // Extract keywords from user input using LLM
+          try {
+            // Get the current API key
+            const currentApiKey = apiKey || process.env.NEXT_PUBLIC_ZHIPU_API_KEY;
+            
+            const response = await fetch("/api/extract-keywords", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ 
+                userInput: transcript,
+                apiKey: currentApiKey
+              }),
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+              console.error('Keyword extraction error:', data.error);
+              // Use speech to notify error
+              if (speech) {
+                speech.speak('Sorry, I could not process your request. Using your original words to search.');
+              }
+              setErrorMessage('Keyword extraction failed. Using original input.');
+              setTimeout(() => setErrorMessage(''), 3000);
+              // Keep using original transcript (already set)
+            } else {
+              console.log('Extracted keywords:', data.keywords);
+              // Update search box with extracted keywords
+              setSearchQuery(data.keywords);
+            }
+            
+            setHasSearched(true);
+            setShowResults(false);
+            
+            // Trigger search after short delay with extracted keywords
+            setTimeout(() => {
+              handleFetchAndSummarize(data.keywords || transcript);
+              setTimeout(() => setShowResults(true), 550);
+            }, 300);
+          } catch (error) {
+            console.error('Error extracting keywords:', error);
+            // Use speech to notify error
+            if (speech) {
+              speech.speak('Network error occurred. Using your original words to search.');
+            }
+            setErrorMessage('Network error. Using original input.');
+            setTimeout(() => setErrorMessage(''), 3000);
+            // Keep using original transcript (already set)
+            setHasSearched(true);
+            setShowResults(false);
+            setTimeout(() => {
+              handleFetchAndSummarize(transcript);
+              setTimeout(() => setShowResults(true), 550);
+            }, 300);
+          }
+        },
+        // Status callback
+        (status) => {
+          if (status.isWaitingForCommand !== undefined) {
+            setIsWaitingForCommand(status.isWaitingForCommand);
+          }
+          if (status.recognizedText !== undefined) {
+            setRecognizedText(status.recognizedText);
+          }
+        }
+      );
+
+      const initialized = speech.init();
+      if (initialized) {
+        speech.setLanguage('en-US'); // Default to English
+        setSpeechToSearch(speech);
+        // Automatically start listening when page loads
+        speech.startListening();
+        setIsListening(true);
+      }
+
+      return () => {
+        if (speech) {
+          speech.stopListening();
+        }
+      };
+    }
+  }, [settingsReady, apiKey]);
 
   // Extract story titles from the API result (first few words of each story)
   const extractStoryTitles = (resultText) => {
@@ -194,12 +295,21 @@ export default function Home() {
   };
 
   // Call backend API to fetch and summarize news
-  const handleFetchAndSummarize = async () => {
+  const handleFetchAndSummarize = async (query) => {
+    const searchTerm = query || searchQuery;
+    
+    // Stop voice recognition during search
+    setIsSearching(true);
+    setRecognizedText(''); // Clear recognized text display
+    if (speechToSearch && isListening) {
+      console.log('⏸️ Pausing voice recognition during search...');
+      speechToSearch.stopListening();
+      setIsListening(false);
+    }
+    
     setLoading(true);
     setShowSummaryFade(false);
-    const displayQuery = searchQuery.trim() || "top and most popular global headlines from major news sources";
-    const lang = detectLanguage(displayQuery);
-    setSummaryLang(lang);
+    const displayQuery = searchTerm.trim() || "top and most popular global headlines from major news sources";
     setSummary(`Fetching news about: ${displayQuery}. Please wait.`);
 
     try {
@@ -210,7 +320,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          query: searchQuery, 
+          query: searchTerm, 
           apiKey,
           previousStories: previousStories,
           language: lang
@@ -242,7 +352,7 @@ export default function Home() {
       
       // Store summary in history
       addItem({
-        query: searchQuery || 'global headlines',
+        query: searchTerm || 'global headlines',
         result: result,
         timestamp: new Date().toISOString()
       });
@@ -250,32 +360,57 @@ export default function Home() {
       setLoading(false);
       // Trigger fade-in animation after a brief delay
       setTimeout(() => setShowSummaryFade(true), 100);
+      
+      // Resume voice recognition after search completes
+      setTimeout(() => {
+        setIsSearching(false);
+        setRecognizedText(''); // Clear for fresh start
+        if (speechToSearch) {
+          console.log('▶️ Resuming voice recognition...');
+          speechToSearch.resetErrorCount(); // Reset error counter on successful search
+          speechToSearch.startListening();
+          setIsListening(true);
+        }
+      }, 1000); // Wait 1 second before resuming
     } catch (error) {
       console.error("Error fetching summary:", error);
       const errorMsg = "Sorry, failed to fetch news due to API misconfiguration or network issues.";
       setSummary(errorMsg);
+      
+      // Use speech to notify error
+      if (speechToSearch) {
+        speechToSearch.speak('Sorry, I could not fetch the news. Please check your internet connection and try again.');
+      }
+      
+      setErrorMessage('Failed to fetch news. Please try again.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      
       setLoading(false);
+      
+      // Resume voice recognition even on error
+      setTimeout(() => {
+        setIsSearching(false);
+        setRecognizedText(''); // Clear for fresh start
+        if (speechToSearch) {
+          console.log('▶️ Resuming voice recognition after error...');
+          speechToSearch.startListening();
+          setIsListening(true);
+        }
+      }, 2000); // Wait 2 seconds before resuming to allow error message to be read
     }
   };
 
-  // Text-to-speech function with voice preference support
-  const speak = (text) => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      // Stop previous playback first
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = summaryLang || "en-US";
-      
-      // Select native speaker voice for the detected language
-      const selectedVoice = selectVoiceForLanguage(summaryLang, voiceType);
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-      
-      // Adjust pitch and rate for pleasantness
-      utterance.pitch = 1.2;
-      utterance.rate = 0.95;
-      window.speechSynthesis.speak(utterance);
+  // Toggle voice listening
+  const toggleVoiceListening = () => {
+    if (!speechToSearch) return;
+    
+    if (isListening) {
+      speechToSearch.stopListening();
+      setIsListening(false);
+      setIsWaitingForCommand(false);
+    } else {
+      speechToSearch.startListening();
+      setIsListening(true);
     }
   };
 
@@ -389,6 +524,42 @@ export default function Home() {
   return (
     <div className={`min-h-screen ${bgStyles.bg} transition-colors duration-300`}>
       <style>{ANIMATIONS_STYLES}</style>
+      
+      {/* Debug: Show recognized text */}
+      {recognizedText && !isSearching && (
+        <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-black/80 text-white rounded-lg shadow-xl">
+          <div className="text-xs font-bold mb-2 text-green-400">🎤 Recognized:</div>
+          <div className="text-sm break-words">{recognizedText}</div>
+          <div className="text-xs mt-2 text-yellow-400">
+            Test Mode: Just speak to trigger search
+          </div>
+        </div>
+      )}
+      
+      {/* Voice listening status indicator */}
+      {isListening && !recognizedText && !isSearching && (
+        <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-green-500/90 text-white rounded-lg shadow-xl">
+          <div className="text-sm font-bold">🎤 Listening... (Test Mode)</div>
+          <div className="text-xs mt-1">Just speak, no wake word needed</div>
+        </div>
+      )}
+      
+      {/* Searching status indicator */}
+      {isSearching && (
+        <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-orange-500/90 text-white rounded-lg shadow-xl">
+          <div className="text-sm font-bold">⏸️ Searching...</div>
+          <div className="text-xs mt-1">Voice recognition paused</div>
+        </div>
+      )}
+      
+      {/* Error message indicator */}
+      {errorMessage && (
+        <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-red-500/90 text-white rounded-lg shadow-xl animate-pulse">
+          <div className="text-sm font-bold">⚠️ Error</div>
+          <div className="text-xs mt-1">{errorMessage}</div>
+        </div>
+      )}
+      
       {/* Settings button - top right corner */}
       <button
         onClick={() => setShowSettings(!showSettings)}
@@ -415,6 +586,7 @@ export default function Home() {
           }`}>
             <h3 className={`${textSizeClasses.heading2} font-bold mb-8`}>Accessibility Settings</h3>
             
+            {/* ...existing settings code... */}
             {/* Contrast Mode */}
             <div className="mb-8">
               <label className={`block font-bold mb-4 ${textSizeClasses.label}`}>Contrast Mode:</label>
@@ -526,7 +698,7 @@ export default function Home() {
                 hasSearched ? 'bg-transparent px-3 py-2 border-transparent' : `${bgStyles.secondaryBg} px-6 py-4`
               } ${bgStyles.input} ${
                 contrastMode === 'high' ? 'border-black' : contrastMode === 'dark' ? 'border-slate-400' : 'border-gray-300'
-              }`}>
+              } ${isWaitingForCommand ? 'ring-4 ring-green-400 ring-opacity-50' : ''}`}>
               <span className={`${textSize === 'large' ? 'text-3xl' : textSize === 'small' ? 'text-lg' : 'text-2xl'} flex-shrink-0`}>🔍</span>
               <input
                 type="text"
@@ -541,25 +713,53 @@ export default function Home() {
                     setTimeout(() => setShowResults(true), 550);
                   }
                 }}
-                placeholder={hasSearched ? 'Refine search...' : 'Search for any news topic... tech, sports, politics, weather...'}
+                placeholder={hasSearched ? 'Refine search...' : '🎤 Speak or type to search... (Test Mode)'}
                 className={`flex-1 bg-transparent outline-none font-medium ${
                   contrastMode === 'high' ? 'text-black placeholder-gray-600' : contrastMode === 'dark' ? 'text-slate-100 placeholder-slate-400' : 'text-gray-900 placeholder-gray-500'
                 } ${hasSearched ? textSizeClasses.bodySmall : textSizeClasses.bodyMedium}`}
                 aria-label="Search for news articles"
               />
+              {/* Voice Search Button */}
+              <button
+                onClick={toggleVoiceListening}
+                disabled={isSearching}
+                className={`flex-shrink-0 p-2 rounded-full transition-all duration-200 ${
+                  isSearching
+                    ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
+                    : isWaitingForCommand
+                    ? 'bg-yellow-500 text-white shadow-lg ring-4 ring-yellow-300 animate-pulse'
+                    : isListening 
+                    ? 'bg-green-500 text-white shadow-lg ring-2 ring-green-300' 
+                    : contrastMode === 'high'
+                    ? 'bg-yellow-400 text-black hover:bg-yellow-500'
+                    : contrastMode === 'dark'
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+                aria-label={isSearching ? 'Searching, voice recognition paused' : isListening ? '🎤 Voice recognition active - Just speak' : 'Start voice input'}
+                title={isSearching ? 'Searching, voice recognition paused' : isListening ? 'Test Mode: Just speak to trigger search' : 'Click to toggle voice search'}
+              >
+                {isSearching ? '⏸️' : isWaitingForCommand ? '🗣️' : '🎤'}
+              </button>
             </div>
 
             {!hasSearched && (
-              <p className={`text-center ${textSizeClasses.hint} ${bgStyles.text} opacity-60 whitespace-nowrap`}>
-                Press Enter to search or try: <span className="font-semibold">"BBC", "Technology", "Sports"
-                <br></br>
-                NewsLens may make mistakes. Always double-check its sources.
-                </span>
-              </p>
+              <>
+                <p className={`text-center ${textSizeClasses.hint} ${bgStyles.text} opacity-60 whitespace-nowrap`}>
+                  Press Enter to search or try: <span className="font-semibold">"BBC", "Technology", "Sports"</span>
+                </p>
+                <p className={`text-center ${textSizeClasses.hint} ${bgStyles.text} opacity-60 max-w-xs`}>
+                  <br />
+                  NewsLens may make mistakes. Always double-check its sources.
+                  <br />
+                  🎤 Test Mode: Just speak to search, or type and press Enter
+                </p>
+              </>
             )}
           </div>
         </div>
 
+        {/* ...rest of existing code... */}
         <div className={`${hasSearched ? 'pt-32 w-full' : ''}`}>
           {hasSearched && (showResults || loading || summary || newsCards.length > 0) && (
             <div className={`max-w-7xl mx-auto p-6 transform transition-all duration-500 ease-out ${

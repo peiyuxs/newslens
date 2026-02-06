@@ -12,15 +12,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "NewsLens",
-  description: "Making news accessible to everyone 🎧",
+  title: "NewsLens - Accessible News for Everyone",
+  description: "Get AI-powered news summaries with accessibility features",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         {children}
       </body>
