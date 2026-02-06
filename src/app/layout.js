@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "NextLens",
+  title: "NewsLens",
   description: "Making news accessible to everyone 🎧",
 };
 

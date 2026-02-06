@@ -104,20 +104,23 @@ export const parseNewsSummary = (summaryText) => {
     const firstLine = numberedMatch ? numberedMatch[2] : trimmedSection.split('\n')[0];
     
     // Clean markdown formatting from headline
-    headline = firstLine
-      .replace(/^#+\s*/, '') // Remove markdown headers
-      .replace(/\*\*/g, '') // Remove bold formatting
-      .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes
-      .trim();
+      headline = firstLine
+        .replace(/^#+\s*/, '') // Remove markdown headers
+        .replace(/\*\*/g, '') // Remove bold formatting
+        .replace(/^["'`]+|["'`]+$/g, '') // Remove quotes
+        .trim()
+        .replace(/^[\-–—]\s*/, ''); // Remove leading bullet/dash markers from headline
     
     // Get content (everything after the first line)
     const lines = trimmedSection.split('\n');
     if (lines.length > 1) {
-      content = lines
-        .slice(1)
-        .join('\n')
-        .replace(/\*+/g, '') // Remove extra asterisks
-        .trim();
+        content = lines
+          .slice(1)
+          .join('\n')
+          .replace(/\*+/g, '') // Remove extra asterisks
+          .trim()
+          .replace(/(^|\n)\s*[\-–—]\s+/g, '$1') // Remove leading dash/bullet markers at the start of lines
+          .replace(/^[\-–—]\s*/, '').trim(); // Remove leading dash/bullet markers from content
     }
     
     // If no content found, use the cleaned headline repeated or part of it
