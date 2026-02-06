@@ -51,7 +51,7 @@ export default function Home() {
         async (transcript) => {
           console.log('User command received:', transcript);
           
-          // 立即显示用户说的话到搜索框
+          // Immediately display user's speech in search box
           setSearchQuery(transcript);
           
           // Extract keywords from user input using LLM
@@ -80,10 +80,10 @@ export default function Home() {
               }
               setErrorMessage('Keyword extraction failed. Using original input.');
               setTimeout(() => setErrorMessage(''), 3000);
-              // 保持使用原始 transcript（已经设置过了）
+              // Keep using original transcript (already set)
             } else {
               console.log('Extracted keywords:', data.keywords);
-              // 用提取的关键词更新搜索框
+              // Update search box with extracted keywords
               setSearchQuery(data.keywords);
             }
             
@@ -103,7 +103,7 @@ export default function Home() {
             }
             setErrorMessage('Network error. Using original input.');
             setTimeout(() => setErrorMessage(''), 3000);
-            // 保持使用原始 transcript（已经设置过了）
+            // Keep using original transcript (already set)
             setHasSearched(true);
             setShowResults(false);
             setTimeout(() => {
@@ -335,10 +335,10 @@ export default function Home() {
       {/* Debug: Show recognized text */}
       {recognizedText && !isSearching && (
         <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-black/80 text-white rounded-lg shadow-xl">
-          <div className="text-xs font-bold mb-2 text-green-400">🎤 识别到:</div>
+          <div className="text-xs font-bold mb-2 text-green-400">🎤 Recognized:</div>
           <div className="text-sm break-words">{recognizedText}</div>
           <div className="text-xs mt-2 text-yellow-400">
-            测试模式：直接说话即可触发搜索
+            Test Mode: Just speak to trigger search
           </div>
         </div>
       )}
@@ -346,23 +346,23 @@ export default function Home() {
       {/* Voice listening status indicator */}
       {isListening && !recognizedText && !isSearching && (
         <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-green-500/90 text-white rounded-lg shadow-xl">
-          <div className="text-sm font-bold">🎤 Listening... (测试模式)</div>
-          <div className="text-xs mt-1">直接说话即可，无需唤醒词</div>
+          <div className="text-sm font-bold">🎤 Listening... (Test Mode)</div>
+          <div className="text-xs mt-1">Just speak, no wake word needed</div>
         </div>
       )}
       
       {/* Searching status indicator */}
       {isSearching && (
         <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-orange-500/90 text-white rounded-lg shadow-xl">
-          <div className="text-sm font-bold">⏸️ 搜索中...</div>
-          <div className="text-xs mt-1">语音识别已暂停</div>
+          <div className="text-sm font-bold">⏸️ Searching...</div>
+          <div className="text-xs mt-1">Voice recognition paused</div>
         </div>
       )}
       
       {/* Error message indicator */}
       {errorMessage && (
         <div className="fixed top-20 right-6 z-50 max-w-xs p-4 bg-red-500/90 text-white rounded-lg shadow-xl animate-pulse">
-          <div className="text-sm font-bold">⚠️ 错误</div>
+          <div className="text-sm font-bold">⚠️ Error</div>
           <div className="text-xs mt-1">{errorMessage}</div>
         </div>
       )}
@@ -520,7 +520,7 @@ export default function Home() {
                     setTimeout(() => setShowResults(true), 550);
                   }
                 }}
-                placeholder={hasSearched ? 'Refine search...' : '🎤 直接说话或输入文字搜索...（测试模式）'}
+                placeholder={hasSearched ? 'Refine search...' : '🎤 Speak or type to search... (Test Mode)'}
                 className={`flex-1 bg-transparent outline-none font-medium ${
                   contrastMode === 'high' ? 'text-black placeholder-gray-600' : contrastMode === 'dark' ? 'text-slate-100 placeholder-slate-400' : 'text-gray-900 placeholder-gray-500'
                 } ${hasSearched ? textSizeClasses.bodySmall : textSizeClasses.bodyMedium}`}
@@ -543,8 +543,8 @@ export default function Home() {
                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                     : 'bg-blue-500 text-white hover:bg-blue-600'
                 }`}
-                aria-label={isSearching ? '搜索中，语音识别已暂停' : isListening ? '🎤 语音识别已激活 - 直接说话即可' : '开始语音输入'}
-                title={isSearching ? '搜索中，语音识别已暂停' : isListening ? '测试模式：直接说话即可触发搜索' : '点击切换语音搜索'}
+                aria-label={isSearching ? 'Searching, voice recognition paused' : isListening ? '🎤 Voice recognition active - Just speak' : 'Start voice input'}
+                title={isSearching ? 'Searching, voice recognition paused' : isListening ? 'Test Mode: Just speak to trigger search' : 'Click to toggle voice search'}
               >
                 {isSearching ? '⏸️' : isWaitingForCommand ? '🗣️' : '🎤'}
               </button>
@@ -559,7 +559,7 @@ export default function Home() {
                   <br />
                   NewsLens may make mistakes. Always double-check its sources.
                   <br />
-                  🎤 测试模式：直接说话即可搜索，或输入文字按 Enter
+                  🎤 Test Mode: Just speak to search, or type and press Enter
                 </p>
               </>
             )}
