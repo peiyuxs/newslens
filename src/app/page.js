@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import useLocalStorage from './localstorage';
+import { fetchAPIKey, fetchAndSummarizeNews } from '@/lib/apiHelpers';
+import { getContrastStyles, getTextSizeClasses, getBgStyles } from '@/lib/styleHelpers';
+import { speak } from '@/lib/audioHelpers';
+import { ANIMATIONS_STYLES } from '@/lib/constants';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -9,6 +13,8 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [articles, setArticles] = useState([]);
 
   const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
   const { storedValue: storedStories, setValue: setStoredStories } = useLocalStorage('news-stories', []);
@@ -140,42 +146,9 @@ export default function Home() {
     }
   };
 
-  // Get contrast mode styles
-  const getContrastStyles = () => {
-    if (contrastMode === "high") {
-      return {
-        bgClass: "bg-black",
-        textClass: "text-white",
-        borderClass: "border-white",
-        accentClass: "bg-yellow-300 text-black",
-      };
-    } else if (contrastMode === "dark") {
-      return {
-        bgClass: "bg-slate-950",
-        textClass: "text-slate-100",
-        borderClass: "border-slate-300",
-        accentClass: "bg-blue-600",
-      };
-    }
-    return {
-      bgClass: "bg-zinc-900",
-      textClass: "text-white",
-      borderClass: "border-zinc-700",
-      accentClass: "bg-emerald-500 hover:bg-emerald-400",
-    };
-  };
-
-  // Get text size multiplier
-  const getTextSizeClass = (baseSize) => {
-    if (textSize === "large") {
-      return `text-[${parseInt(baseSize.replace("text-", "").replace("xl", "4")) * 1.3}xl]`;
-    } else if (textSize === "small") {
-      return `text-[${parseInt(baseSize.replace("text-", "").replace("xl", "4")) * 0.8}xl]`;
-    }
-    return baseSize;
-  };
-
-  const contrastStyles = getContrastStyles();
+  const contrastStyles = getContrastStyles(contrastMode);
+  const bgStyles = getBgStyles(contrastMode);
+  const textSizeClasses = getTextSizeClasses(textSize);
 
   // Don't render until settings are loaded from localStorage
   if (!settingsReady) {
