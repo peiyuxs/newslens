@@ -1,15 +1,20 @@
 # NewsLens
 Welcome to NewsLens, an inclusive website specifically made for visually impaired people.
-Find the latest and most popular news on NewsLens using our speech-to-text feature.
+Find the latest and most popular news on NewsLens using our speech-to-text feature, powered by the [Zhipu BigModel AI API](https://open.bigmodel.cn/).
 
 NewsLens is a [Next.js](https://nextjs.org) project, bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) and deployed on the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 ## Contributors
-Pei Liao,
-Chen Ying,
-Alex Sung,
-David ,
-Alex Li,
+Pei Liao, [@peiyuxs](https://github.com/peiyux)
+
+Tina Chen, [@Tina1114](https://github.com/Tina1114)
+
+Alex Sung, [@feltxzx](https://github.com/feltxzx)
+
+David Luu, [@](https://github.com/D128405)
+
+Alex Li, [@yook40](https://github.com/yook40)
+
 
 ## Contributing & Forking
 We welcome contributions and forks. To create your own copy of this repository and work locally:
