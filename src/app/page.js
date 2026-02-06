@@ -16,6 +16,7 @@ export default function Home() {
   const [hasSearched, setHasSearched] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [articles, setArticles] = useState([]);
+  const [showSummaryFade, setShowSummaryFade] = useState(false);
 
   const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
   const { storedValue: storedStories, setValue: setStoredStories } = useLocalStorage('news-stories', []);
@@ -88,6 +89,7 @@ export default function Home() {
   // Call backend API to fetch and summarize news
   const handleFetchAndSummarize = async () => {
     setLoading(true);
+    setShowSummaryFade(false);
     const displayQuery = searchQuery.trim() || "top and most popular global headlines from major news sources";
     setSummary(`Fetching news about: ${displayQuery}. Please wait.`);
 
@@ -126,6 +128,8 @@ export default function Home() {
       });
       
       setLoading(false);
+      // Trigger fade-in animation after a brief delay
+      setTimeout(() => setShowSummaryFade(true), 100);
     } catch (error) {
       console.error("Error fetching summary:", error);
       const errorMsg = "Sorry, failed to fetch news due to API misconfiguration or network issues.";
@@ -319,7 +323,7 @@ export default function Home() {
         <div
           className={`fixed z-20 transition-all duration-600 ease-out ${
             hasSearched
-              ? 'left-4 top-4 right-20'
+              ? 'left-4 top-4 right-32'
               : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
           } ${
             hasSearched ? `${bgStyles.secondaryBg} rounded-xl px-4 py-3 shadow-md transition-all duration-300` : ''
@@ -398,7 +402,9 @@ export default function Home() {
               </div>
 
               {summary && !loading && (
-                <div className={`mb-12 p-8 rounded-2xl border-4 transition-opacity duration-700 ease-out transform opacity-100 ${
+                <div className={`mb-12 p-8 rounded-2xl border-4 transition-opacity duration-700 ease-out transform ${
+                  showSummaryFade ? 'opacity-100' : 'opacity-0'
+                } ${
                   contrastMode === 'high'
                     ? 'bg-yellow-50 border-black text-black'
                     : contrastMode === 'dark'
