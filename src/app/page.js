@@ -178,15 +178,23 @@ export default function Home() {
       </button>
 
       {/* Accessibility Settings Panel */}
-      {showSettings && (
-        <div className={`fixed inset-0 z-40 ${
-          contrastMode === "high"
-            ? "bg-black bg-opacity-50"
-            : contrastMode === "dark"
-            ? "bg-black bg-opacity-70"
-            : "bg-black bg-opacity-30"
-        } flex items-center justify-center p-4 backdrop-blur-sm`}>
-          <div className={`${bgStyles.secondaryBg} ${bgStyles.text} rounded-2xl p-8 max-w-md w-full border-4 ${
+      <div
+        className={`fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-300`}
+        style={{
+          backgroundColor:
+            contrastMode === "high"
+              ? "rgba(0,0,0,0.5)"
+              : contrastMode === "dark"
+              ? "rgba(0,0,0,0.7)"
+              : "rgba(0,0,0,0.3)",
+          pointerEvents: showSettings ? "auto" : "none",
+          opacity: showSettings ? 1 : 0,
+        }}
+        aria-hidden={!showSettings}
+      >
+        <div className={`${bgStyles.secondaryBg} ${bgStyles.text} rounded-2xl p-8 max-w-md w-full border-4 transform transition-all duration-300 ease-out ${
+            showSettings ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          } ${
             contrastMode === "high" ? "border-black" : contrastMode === "dark" ? "border-slate-400" : "border-gray-200"
           }`}>
             <h3 className={`${textSizeClasses.heading2} font-bold mb-8`}>Accessibility Settings</h3>
@@ -247,7 +255,6 @@ export default function Home() {
             </button>
           </div>
         </div>
-      )}
 
       {/* Main Content */}
       {!hasSearched ? (
