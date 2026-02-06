@@ -1,41 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# NewsLens
+Welcome to NewsLens, an inclusive website specifically made for visually impaired people.
+Find the latest and most popular news on NewsLens using our speech-to-text feature, powered by the [Zhipu BigModel AI API](https://open.bigmodel.cn/).
 
-## NewsLens
+NewsLens is a [Next.js](https://nextjs.org) project, bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) and deployed on the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Welcome to NewsLens, an inclusive website specifically made for visually impaired.
-Find the latest and most popular news on NewsLens, using “Hey, NewsLens” to start your query. 
+## Contributors
+Pei Liao, [@peiyuxs](https://github.com/peiyux)
 
-## Getting Started
+Tina Chen, [@Tina1114](https://github.com/Tina1114)
 
-First, run the development server:
+Alex Sung, [@feltxzx](https://github.com/feltxzx)
 
+David Luu, [@](https://github.com/D128405)
+
+Alex Li, [@yook40](https://github.com/yook40)
+
+
+## Contributing & Forking
+We welcome contributions and forks. To create your own copy of this repository and work locally:
+1. Fork the repository on GitHub using the "Fork" button (top-right of the repo page).
+2. Clone your fork to your machine:
+```bash
+git clone https://github.com/<your-username>/newslens.git
+cd newslens
+```
+3. (Optional) Create a new branch for your work:
+
+```bash
+git checkout -b feature/my-change
+```
+4. Make changes, commit, and push to your fork:
+```bash
+git add .
+git commit -m "Describe your change"
+git push origin feature/my-change
+```
+5. Open a Pull Request from your fork/branch back to the main repository when ready.
+Please include a clear description of what you changed and why, and any testing steps.
+
+## Installation (Local Development)
+Install dependencies and run the dev server locally using one of the supported package managers.
+1. Install dependencies (choose one):
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+2. Start the development server:
 ```bash
 npm run dev
 # or
 yarn dev
 # or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Open http://localhost:3000 in your browser.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Notes:
+- If you use environment variables (API keys), add them to a `.env.local` file at the project root.
+- The app uses the Next.js App Router and Tailwind CSS; see `package.json` for scripts.
