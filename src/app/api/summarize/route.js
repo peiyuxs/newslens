@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
-  const { query, apiKey: clientApiKey } = await request.json();
+  const { query, apiKey: clientApiKey, previousStories = [] } = await request.json();
   const apiKey = clientApiKey || process.env.ZHIPU_API_KEY;
 
   if (!apiKey) {
@@ -10,6 +10,11 @@ export async function POST(request) {
 
   // Default to global headlines if no query provided
   const searchQuery = query && query.trim() ? query.trim() : "top and most popular global headlines from major news sources like CNN, BBC, Reuters, Associated Press, and other reliable sources";
+
+  // Build exclusion list for system prompt
+  const exclusionNote = previousStories.length > 0 
+    ? `\n\nIMPORTANT: Do NOT include these previously shown stories: ${previousStories.join("; ")}. Provide fresh, new stories instead.`
+    : "";
 
   try {
     const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
@@ -23,7 +28,7 @@ export async function POST(request) {
         messages: [
           {
             role: "system",
-            content: "You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 current news items related to that query, and provide a concise one-sentence summary for each news item. Reply in English. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources."
+            content: "You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 current news items related to that query, and provide a concise one-sentence summary for each news item. Reply in English. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources." + exclusionNote
           },
           {
             role: "user",
