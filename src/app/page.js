@@ -336,9 +336,9 @@ export default function Home() {
                   setSearchQuery("");
                 }
               }}
-              className={`${hasSearched ? 'text-3xl font-black flex-shrink-0' : textSizeClasses.logo} font-black text-blue-600 cursor-pointer transition-all duration-300 whitespace-nowrap`}
+              className={`${hasSearched ? 'flex-shrink-0' : textSizeClasses.logo} cursor-pointer transition-all duration-300 whitespace-nowrap`}
             >
-              News<span className="text-blue-600">Lens</span>
+              <img src="/NewsLens_Logo.svg" alt="NewsLens logo" className={`${hasSearched ? 'h-8 md:h-10' : 'h-14 md:h-16'} block`} />
             </button>
 
             {!hasSearched && (
@@ -347,7 +347,7 @@ export default function Home() {
               </p>
             )}
 
-            <div className={`flex gap-3 items-center rounded-full border-2 transition-all duration-300 shadow-lg ${
+            <div className={`flex gap-3 items-center rounded-full border-2 transition-all duration-300 shadow-lg w-full max-w-4xl ${
                 hasSearched ? 'bg-transparent px-3 py-2 border-transparent flex-1' : `${bgStyles.secondaryBg} px-6 py-4`
               } ${bgStyles.input} ${
                 contrastMode === 'high' ? 'border-black' : contrastMode === 'dark' ? 'border-slate-400' : 'border-gray-300'
@@ -455,7 +455,8 @@ export default function Home() {
           ? "border-slate-400"
           : "border-gray-200"
       }`}>
-        <p>NewsLens - Making news accessible to everyone 🎧</p>
+        <p>NewsLens - Making news accessible to everyone 🎧
+        </p>
       </footer>
     </div>
   );
