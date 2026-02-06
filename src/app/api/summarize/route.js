@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(request) {
   const { query, apiKey: clientApiKey, previousStories = [] } = await request.json();
-  const apiKey = clientApiKey || process.env.ZHIPU_API_KEY;
+  const apiKey = '7a12d1d7f81c4792aefc00d2f6033f78.colo5oAdAXtydx0t'; // clientApiKey || process.env.ZHIPU_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json({ error: "API Key not provided. Please check .env configuration." }, { status: 400 });

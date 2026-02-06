@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import useLocalStorage from './localstorage';
 import { fetchAPIKey, fetchAndSummarizeNews } from '@/lib/apiHelpers';
 import { getContrastStyles, getTextSizeClasses, getBgStyles } from '@/lib/styleHelpers';
@@ -19,6 +19,9 @@ export default function Home() {
   const [articles, setArticles] = useState([]);
   const [showSummaryFade, setShowSummaryFade] = useState(false);
   const [newsCards, setNewsCards] = useState([]);
+  const [currentPlayingId, setCurrentPlayingId] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const utteranceRef = useRef(null);
 
   const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
   const { storedValue: savedNewsCards, setValue: setSavedNewsCards } = useLocalStorage('news-cards', []);
@@ -197,6 +200,102 @@ export default function Home() {
       window.speechSynthesis.speak(utterance);
     }
   };
+
+  // Advanced play/pause controls: keep a reference to the active utterance
+  const startSpeaking = (text, id) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    // Cancel any existing speech
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US";
+
+    // Try to apply voice preference
+    if (voiceType !== "default" && typeof window !== "undefined") {
+      try {
+        const voices = window.speechSynthesis.getVoices();
+        let selectedVoice = null;
+        if (voiceType === "male") {
+          selectedVoice = voices.find(v => v.name.toLowerCase() === 'google uk english male') ||
+                         voices.find(v => v.name.toLowerCase().includes('david')) ||
+                         voices.find(v => v.name.toLowerCase().includes('male')) ||
+                         voices.find(v => v.name.includes('US English') && !v.name.includes('Female')) ||
+                         voices[0];
+        } else if (voiceType === "female") {
+          selectedVoice = voices.find(v => v.name.toLowerCase() === 'google uk english female') ||
+                         voices.find(v => v.name.toLowerCase().includes('victoria')) ||
+                         voices.find(v => v.name.toLowerCase().includes('female')) ||
+                         voices[1] || voices[0];
+        } else if (voiceType === "neutral") {
+          selectedVoice = voices.find(v => v.name.toLowerCase().includes('samantha')) ||
+                         voices.find(v => v.name.toLowerCase().includes('google')) ||
+                         voices[0];
+        }
+        if (selectedVoice) u.voice = selectedVoice;
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    u.pitch = 1.2;
+    u.rate = 0.95;
+    u.onend = () => {
+      setCurrentPlayingId(null);
+      setIsPaused(false);
+      utteranceRef.current = null;
+    };
+
+    utteranceRef.current = u;
+    window.speechSynthesis.speak(u);
+    setCurrentPlayingId(id);
+    setIsPaused(false);
+  };
+
+  const togglePlayPause = (card) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    // If clicking a different card, start speaking that card
+    if (currentPlayingId !== card.id) {
+      startSpeaking(`${card.headline}. ${card.content}`, card.id);
+      return;
+    }
+
+    // If same card, toggle pause/resume using local `isPaused` state
+    if (isPaused) {
+      // Try to resume; if the utterance reference was lost, restart speaking
+      try {
+        window.speechSynthesis.resume();
+        setIsPaused(false);
+        // If utterance was cleared for some reason, restart from beginning
+        if (!utteranceRef.current) {
+          startSpeaking(`${card.headline}. ${card.content}`, card.id);
+        }
+      } catch (e) {
+        // Fall back to restarting if resume fails
+        startSpeaking(`${card.headline}. ${card.content}`, card.id);
+      }
+    } else {
+      // Pause current speech
+      try {
+        window.speechSynthesis.pause();
+        setIsPaused(true);
+      } catch (e) {
+        // If pause isn't supported, cancel speech and mark stopped
+        window.speechSynthesis.cancel();
+        setCurrentPlayingId(null);
+        setIsPaused(false);
+        utteranceRef.current = null;
+      }
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const contrastStyles = getContrastStyles(contrastMode);
   const bgStyles = getBgStyles(contrastMode);
@@ -417,11 +516,21 @@ export default function Home() {
                         {card.content}
                       </p>
                       <button
-                        onClick={() => speak(`${card.headline}. ${card.content}`)}
+                        onClick={() => togglePlayPause(card)}
                         className={`w-full px-4 py-2 rounded-lg ${getButtonClasses(contrastMode, textSizeClasses, 'primary')}`}
-                        aria-label={`Read ${card.headline} aloud`}
+                        aria-label={
+                          currentPlayingId === card.id && !isPaused
+                            ? `Pause reading ${card.headline}`
+                            : currentPlayingId === card.id && isPaused
+                            ? `Resume reading ${card.headline}`
+                            : `Play reading ${card.headline}`
+                        }
                       >
-                        🔊 Read
+                        {currentPlayingId === card.id && !isPaused
+                          ? '⏸️ Pause'
+                          : currentPlayingId === card.id && isPaused
+                          ? '▶️ Resume'
+                          : '▶️ Play'}
                       </button>
                     </div>
                   ))}
