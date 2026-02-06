@@ -11,7 +11,7 @@ Tina Chen, [@Tina1114](https://github.com/Tina1114)
 
 Alex Sung, [@feltxzx](https://github.com/feltxzx)
 
-David Luu, [@](https://github.com/D128405)
+David Luu, [@D128405](https://github.com/D128405)
 
 Alex Li, [@yook40](https://github.com/yook40)
 
