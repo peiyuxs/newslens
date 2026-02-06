@@ -13,6 +13,8 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [articles, setArticles] = useState([]);
 
   const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
   const { storedValue: storedStories, setValue: setStoredStories } = useLocalStorage('news-stories', []);
