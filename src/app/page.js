@@ -12,6 +12,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentSearchTerm, setCurrentSearchTerm] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -317,10 +318,10 @@ export default function Home() {
       <div className="relative min-h-screen">
         {/* Header (centered on landing, shrinks/moves to top-left on search) */}
         <div
-          className={`fixed z-20 transition-all duration-600 ease-out ${
+          className={`fixed z-20 transition-all duration-600 ease-out ${!hasSearched ? 'w-screen' : ''} ${
             hasSearched
               ? 'left-4 top-4 right-32'
-              : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
+              : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-20'
           } ${
             hasSearched ? `${bgStyles.secondaryBg} rounded-xl px-4 py-3 shadow-md transition-all duration-300` : ''
           }`}
@@ -342,13 +343,13 @@ export default function Home() {
             </button>
 
             {!hasSearched && (
-              <p className={`${textSizeClasses.subtitle} ${bgStyles.text} text-center max-w-2xl font-light opacity-80`}>
+              <p className={`${textSizeClasses.subtitle} ${bgStyles.text} text-center font-light opacity-80`}>
                 Accessible News for Everyone
               </p>
             )}
 
-            <div className={`flex gap-3 items-center rounded-full border-2 transition-all duration-300 shadow-lg w-full max-w-4xl ${
-                hasSearched ? 'bg-transparent px-3 py-2 border-transparent flex-1' : `${bgStyles.secondaryBg} px-6 py-4`
+            <div className={`flex gap-3 items-center rounded-full border-2 transition-all duration-300 shadow-lg ${hasSearched ? 'w-full' : 'w-full'} ${
+                hasSearched ? 'bg-transparent px-3 py-2 border-transparent' : `${bgStyles.secondaryBg} px-6 py-4`
               } ${bgStyles.input} ${
                 contrastMode === 'high' ? 'border-black' : contrastMode === 'dark' ? 'border-slate-400' : 'border-gray-300'
               }`}>
@@ -359,6 +360,7 @@ export default function Home() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
+                    setCurrentSearchTerm(searchQuery);
                     setHasSearched(true);
                     setShowResults(false);
                     handleFetchAndSummarize();
@@ -374,8 +376,11 @@ export default function Home() {
             </div>
 
             {!hasSearched && (
-              <p className={`text-center ${textSizeClasses.hint} ${bgStyles.text} opacity-60 max-w-xs`}>
-                Press Enter to search or try: <span className="font-semibold">"BBC", "Technology", "Sports"</span>
+              <p className={`text-center ${textSizeClasses.hint} ${bgStyles.text} opacity-60 whitespace-nowrap`}>
+                Press Enter to search or try: <span className="font-semibold">"BBC", "Technology", "Sports"
+                <br></br>
+                NewsLens may make mistakes. Always double-check its sources.
+                </span>
               </p>
             )}
           </div>
@@ -388,7 +393,7 @@ export default function Home() {
             }`}>
               <div className="mb-8">
                 <h2 className={`${textSizeClasses.heading} font-bold ${bgStyles.text} mb-2`}>
-                  Results for: <span className={bgStyles.accent}>"{searchQuery || 'Global News'}"</span>
+                  Results for: <span className={bgStyles.accent}>"{currentSearchTerm || 'Global News'}"</span>
                 </h2>
                 {loading && (
                   <p className={`${textSizeClasses.bodyMedium} ${bgStyles.text} opacity-60`}>
