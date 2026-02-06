@@ -1,5 +1,10 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## NewsLens
+
+Welcome to NewsLens, an inclusive website specifically made for visually impaired.
+Find the latest and most popular news on NewsLens, using “Hey, NewsLens” to start your query. 
+
 ## Getting Started
 
 First, run the development server:

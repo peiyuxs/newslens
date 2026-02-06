@@ -9,7 +9,7 @@ export async function POST(request) {
   }
 
   // Default to global headlines if no query provided
-  const searchQuery = query && query.trim() ? query.trim() : "top and most popular global headlines from major news sources like CNN, BBC, Reuters, Associated Press, and other reliable sources";
+  const searchQuery = query && query.trim() ? query.trim() : "Most popular and relevant news from the following news outlets: CNN, BBC, Le Monde, DW, Times of India, The Japan Times, China Daily";
 
   // Build exclusion list for system prompt
   const exclusionNote = previousStories.length > 0 
@@ -28,11 +28,11 @@ export async function POST(request) {
         messages: [
           {
             role: "system",
-            content: "You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 current news items related to that query, and provide a concise one-sentence summary for each news item. Reply in English. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources." + exclusionNote
+            content: "You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 most current, popular, and relevant news summaries related to that query, and provide an 150-250 words summary with a brief headline for each news summary item. Reply in the language the user provides input in; if no language was detected, fall back to British English. Start summarizing directly without any introduction. If no specific query is provided, provide the most relevant headlines from the following news sources: CNN, BBC, Le Monde, DW, Times of India, The Japan Times, China Daily. Provide the name of the news outlets you retrieved the news from." + exclusionNote
           },
           {
             role: "user",
-            content: `Please find and summarize the top 3 news articles about: ${searchQuery}`
+            content: `Find and summarize the top 3 news about: ${searchQuery}`
           }
         ],
       }),
