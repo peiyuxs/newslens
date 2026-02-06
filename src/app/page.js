@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import useLocalStorage from './localstorage';
 import { fetchAPIKey, fetchAndSummarizeNews } from '@/lib/apiHelpers';
 import { getContrastStyles, getTextSizeClasses, getBgStyles } from '@/lib/styleHelpers';
+import { getButtonClasses, getCardClasses, getSettingsPanelClasses, getInputClasses, getBackdropClasses, parseNewsSummary } from '@/lib/componentHelpers';
 import { speak } from '@/lib/audioHelpers';
 import { ANIMATIONS_STYLES } from '@/lib/constants';
 
@@ -17,8 +18,10 @@ export default function Home() {
   const [showResults, setShowResults] = useState(false);
   const [articles, setArticles] = useState([]);
   const [showSummaryFade, setShowSummaryFade] = useState(false);
+  const [newsCards, setNewsCards] = useState([]);
 
   const { storedValue: savedSummaries, addItem } = useLocalStorage('news-summaries', []);
+  const { storedValue: savedNewsCards, setValue: setSavedNewsCards } = useLocalStorage('news-cards', []);
   const { storedValue: storedStories, setValue: setStoredStories } = useLocalStorage('news-stories', []);
   const { storedValue: contrastMode, setValue: setContrastMode, isLoaded: contrastLoaded } = useLocalStorage('contrastMode', "normal");
   const { storedValue: textSize, setValue: setTextSize, isLoaded: textSizeLoaded } = useLocalStorage('textSize', "normal");
@@ -115,6 +118,16 @@ export default function Home() {
 
       const result = data.result;
       setSummary(result);
+      
+      // Parse summary into individual news cards
+      const parsedCards = parseNewsSummary(result);
+      setNewsCards(parsedCards);
+      
+      // Store parsed cards in localStorage
+      const MAX_CARD_HISTORY = 100;
+      const existingCards = Array.isArray(savedNewsCards) ? savedNewsCards : [];
+      const allCards = [...existingCards, ...parsedCards].slice(-MAX_CARD_HISTORY);
+      setSavedNewsCards(allCards);
       
       // Extract and store story titles for deduplication
       const newStories = extractStoryTitles(result);
@@ -219,22 +232,11 @@ export default function Home() {
       {/* Accessibility Settings Panel */}
       <div
         className={`fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-300`}
-        style={{
-          backgroundColor:
-            contrastMode === "high"
-              ? "rgba(0,0,0,0.5)"
-              : contrastMode === "dark"
-              ? "rgba(0,0,0,0.7)"
-              : "rgba(0,0,0,0.3)",
-          pointerEvents: showSettings ? "auto" : "none",
-          opacity: showSettings ? 1 : 0,
-        }}
+        style={getBackdropClasses(contrastMode, showSettings)}
         aria-hidden={!showSettings}
       >
-        <div className={`${bgStyles.secondaryBg} ${bgStyles.text} rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto border-4 transform transition-all duration-300 ease-out ${
+        <div className={`${getSettingsPanelClasses(contrastMode)} ${bgStyles.text} ${
             showSettings ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-          } ${
-            contrastMode === "high" ? "border-black" : contrastMode === "dark" ? "border-slate-400" : "border-gray-200"
           }`}>
             <h3 className={`${textSizeClasses.heading2} font-bold mb-8`}>Accessibility Settings</h3>
             
@@ -304,13 +306,7 @@ export default function Home() {
 
             <button
               onClick={() => setShowSettings(false)}
-              className={`w-full py-4 rounded-xl font-bold ${textSizeClasses.button} transition-all duration-200 border-2 ${
-                contrastMode === "high"
-                  ? "bg-black text-yellow-400 border-black hover:bg-gray-900"
-                  : contrastMode === "dark"
-                  ? "bg-slate-800 text-blue-400 border-slate-400 hover:bg-slate-700"
-                  : "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-              }`}
+              className={`w-full py-4 rounded-xl ${getButtonClasses(contrastMode, textSizeClasses, 'primary')}`}
             >
               Close Settings
             </button>
@@ -386,7 +382,7 @@ export default function Home() {
         </div>
 
         <div className={`${hasSearched ? 'pt-32 w-full' : ''}`}>
-          {hasSearched && (showResults || loading || summary) && (
+          {hasSearched && (showResults || loading || summary || newsCards.length > 0) && (
             <div className={`max-w-7xl mx-auto p-6 transform transition-all duration-500 ease-out ${
               showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             }`}>
@@ -401,39 +397,38 @@ export default function Home() {
                 )}
               </div>
 
-              {summary && !loading && (
-                <div className={`mb-12 p-8 rounded-2xl border-4 transition-opacity duration-700 ease-out transform ${
-                  showSummaryFade ? 'opacity-100' : 'opacity-0'
-                } ${
-                  contrastMode === 'high'
-                    ? 'bg-yellow-50 border-black text-black'
-                    : contrastMode === 'dark'
-                    ? 'bg-slate-800 border-slate-400 text-slate-100'
-                    : 'bg-blue-50 border-blue-200 text-gray-900'
-                } shadow-lg`}>
-                  <h3 className={`font-bold ${textSizeClasses.heading2} mb-4 flex items-center gap-2`}>
-                    📰 AI Summary
-                  </h3>
-                  <p className={`leading-relaxed whitespace-pre-wrap ${textSizeClasses.bodyLarge}`}>
-                    {summary}
-                  </p>
-                  <button
-                    onClick={() => speak(summary)}
-                    className={`mt-6 px-6 py-3 rounded-lg font-bold ${textSizeClasses.button} transition-all duration-200 border-2 ${
-                      contrastMode === 'high'
-                        ? 'bg-black text-yellow-400 border-black hover:bg-gray-900'
-                        : contrastMode === 'dark'
-                        ? 'bg-slate-700 text-blue-400 border-slate-400 hover:bg-slate-600'
-                        : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    }`}
-                    aria-label="Read summary aloud"
-                  >
-                    🔊 Read Aloud
-                  </button>
+              {summary && !loading && newsCards.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                  {newsCards.map((card, index) => (
+                    <div
+                      key={card.id}
+                      className={`${getCardClasses(contrastMode)} transition-all duration-700 ease-out transform ${
+                        showSummaryFade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                      }`}
+                      style={{
+                        transitionDelay: showSummaryFade ? `${index * 100}ms` : '0ms'
+                      }}
+                    >
+                      <h3 className={`font-bold ${textSizeClasses.heading2} mb-3 flex items-start gap-2`}>
+                        <span className="flex-shrink-0 text-2xl">📰</span>
+                        <span className="line-clamp-3">{card.headline}</span>
+                      </h3>
+                      <p className={`leading-relaxed ${textSizeClasses.bodyMedium} mb-4 line-clamp-6`}>
+                        {card.content}
+                      </p>
+                      <button
+                        onClick={() => speak(`${card.headline}. ${card.content}`)}
+                        className={`w-full px-4 py-2 rounded-lg ${getButtonClasses(contrastMode, textSizeClasses, 'primary')}`}
+                        aria-label={`Read ${card.headline} aloud`}
+                      >
+                        🔊 Read
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {!summary && !loading && (
+              {!summary && !loading && newsCards.length === 0 && (
                 <button
                   onClick={() => {
                     setHasSearched(true);
@@ -442,13 +437,7 @@ export default function Home() {
                     setTimeout(() => setShowResults(true), 550);
                   }}
                   disabled={loading}
-                  className={`w-full py-6 rounded-2xl font-black ${textSizeClasses.heading} shadow-lg transform transition-all duration-200 active:scale-95 border-4 ${
-                    contrastMode === 'high'
-                      ? 'bg-black text-yellow-400 border-black hover:bg-gray-900'
-                      : contrastMode === 'dark'
-                      ? 'bg-slate-700 text-blue-400 border-slate-400 hover:bg-slate-600'
-                      : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                  }`}
+                  className={`w-full py-6 rounded-2xl font-black ${textSizeClasses.heading} shadow-lg transform transition-all duration-200 active:scale-95 border-4 ${getButtonClasses(contrastMode, textSizeClasses, 'primary')}`}
                 >
                   {loading ? '🔄 Summarizing...' : '📖 Fetch & Summarize News'}
                 </button>
