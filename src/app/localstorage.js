@@ -13,16 +13,16 @@ const useLocalStorage = (key, initialValue = []) => {
                     setStoredValue(JSON.parse(item));
                 } else {
                     // Initialize localStorage with the default value if it doesn't exist
-                    setStoredValue(initialValue);
                     window.localStorage.setItem(key, JSON.stringify(initialValue));
                 }
+                setIsLoaded(true);
             }
         } catch (error) {
             console.error('Error reading from localStorage:', error);
             setStoredValue(initialValue);
+            setIsLoaded(true);
         }
-        setIsLoaded(true);
-    }, [key, initialValue]);
+    }, [key]);
 
     const setValue = (value) => {
         try {
