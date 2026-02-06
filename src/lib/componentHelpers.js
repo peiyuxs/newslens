@@ -86,9 +86,9 @@ export const getBackdropClasses = (contrastMode, isOpen) => {
 export const parseNewsSummary = (summaryText) => {
   const cards = [];
   
-  // Split by numbered sections: "1. ", "2. ", etc. or markdown headers
+  // Split by numbered sections at line start: "1. ", "2. ", etc. (only at beginning of line)
   const sections = summaryText
-    .split(/(?=\d+\.\s+|#{1,3}\s+|^---$)/m)
+    .split(/(?=^[\d]+\.\s+)/m)
     .filter(s => s.trim());
   
   sections.forEach((section, index) => {
@@ -99,11 +99,11 @@ export const parseNewsSummary = (summaryText) => {
     let headline = '';
     let content = '';
     
-    // Extract numbered prefix if exists
+    // Extract numbered prefix if exists (only at start of section)
     const numberedMatch = trimmedSection.match(/^(\d+\.\s+)?(.+?)(?:\n|$)/);
     const firstLine = numberedMatch ? numberedMatch[2] : trimmedSection.split('\n')[0];
     
-    // Clean markdown formatting from headline
+    // Clean markdown formatting and digits from headline
     headline = firstLine
       .replace(/^#+\s*/, '') // Remove markdown headers
       .replace(/\*\*/g, '') // Remove bold formatting
@@ -116,17 +116,18 @@ export const parseNewsSummary = (summaryText) => {
       content = lines
         .slice(1)
         .join('\n')
+        .replace(/^\d+\.\s+/, '') // Remove any remaining numbered prefixes
         .replace(/\*+/g, '') // Remove extra asterisks
         .trim();
     }
     
-    // If no content found, use the cleaned headline repeated or part of it
+    // If no content found, use the cleaned headline
     if (!content && headline) {
       content = headline;
     }
     
-    // Only create card if we have at least a headline
-    if (headline) {
+    // Only create card if we have at least a headline with meaningful content
+    if (headline && headline.length > 3) {
       cards.push({
         id: `${Date.now()}-${index}`,
         headline: headline.substring(0, 80), // Limit headline length

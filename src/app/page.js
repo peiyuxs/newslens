@@ -5,7 +5,6 @@ import useLocalStorage from './localstorage';
 import { fetchAPIKey, fetchAndSummarizeNews } from '@/lib/apiHelpers';
 import { getContrastStyles, getTextSizeClasses, getBgStyles } from '@/lib/styleHelpers';
 import { getButtonClasses, getCardClasses, getSettingsPanelClasses, getInputClasses, getBackdropClasses, parseNewsSummary } from '@/lib/componentHelpers';
-import { speak } from '@/lib/audioHelpers';
 import { ANIMATIONS_STYLES } from '@/lib/constants';
 
 export default function Home() {
@@ -30,6 +29,7 @@ export default function Home() {
   const { storedValue: textSize, setValue: setTextSize, isLoaded: textSizeLoaded } = useLocalStorage('textSize', "normal");
   const { storedValue: voiceType, setValue: setVoiceType, isLoaded: voiceLoaded } = useLocalStorage('voiceType', "default");
   const [settingsReady, setSettingsReady] = useState(false);
+  const [summaryLang, setSummaryLang] = useState('en-US');
 
   // Wait for all settings to load before rendering
   useEffect(() => {
@@ -81,6 +81,28 @@ export default function Home() {
     return currentStories.map(story => story.title || story);
   };
 
+  // Simple language detection (script-based heuristic). Returns BCP-47 tag.
+  const detectLanguage = (text) => {
+    if (!text || !text.trim()) return 'en-US';
+    const s = text.trim();
+    // Chinese
+    if (/[\u4E00-\u9FFF]/.test(s)) return 'zh-CN';
+    // Japanese
+    if (/[\u3040-\u30FF]/.test(s)) return 'ja-JP';
+    // Korean
+    if (/[\uAC00-\uD7AF]/.test(s)) return 'ko-KR';
+    // Cyrillic -> Russian
+    if (/[\u0400-\u04FF]/.test(s)) return 'ru-RU';
+    // Arabic
+    if (/[\u0600-\u06FF]/.test(s)) return 'ar-SA';
+    // Devanagari -> Hindi
+    if (/[\u0900-\u097F]/.test(s)) return 'hi-IN';
+    // Basic Latin with common French/German accents -> fallback to English but could be improved
+    if (/[\u00C0-\u00FF]/.test(s)) return 'en-US';
+    // Default to English
+    return 'en-US';
+  };
+
   // Load API key from environment on component mount
   useEffect(() => {
     const loadApiKey = async () => {
@@ -92,11 +114,91 @@ export default function Home() {
     loadApiKey();
   }, []);
 
+  // Select a native-speaker voice by language tag
+  const selectVoiceForLanguage = (lang, voiceType = "default") => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return null;
+    
+    try {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length === 0) return null;
+
+      const langLower = (lang || 'en-US').toLowerCase();
+      const voiceTypeLower = (voiceType || 'default').toLowerCase();
+      
+      // Build patterns to search for based on language
+      let patterns = [];
+      
+      if (langLower.startsWith('zh')) {
+        // Mandarin Chinese
+        patterns = ['mandarin', 'chinese', 'bing', 'google'];
+        if (voiceTypeLower === 'male') patterns.push('xiaoyi', 'yunxi');
+        if (voiceTypeLower === 'female') patterns.push('xiaoxiao', 'yunxi');
+      } else if (langLower.startsWith('ja')) {
+        // Japanese
+        patterns = ['japanese', '日本'];
+        if (voiceTypeLower === 'male') patterns.push('haruka');
+        if (voiceTypeLower === 'female') patterns.push('mizuki', 'shiori');
+      } else if (langLower.startsWith('ko')) {
+        // Korean
+        patterns = ['korean', 'korea'];
+        if (voiceTypeLower === 'male') patterns.push('seunghan', 'jinho');
+        if (voiceTypeLower === 'female') patterns.push('sora');
+      } else if (langLower.startsWith('ru')) {
+        // Russian
+        patterns = ['russian', 'русский'];
+        if (voiceTypeLower === 'male') patterns.push('максим');
+        if (voiceTypeLower === 'female') patterns.push('наталья');
+      } else if (langLower.startsWith('ar')) {
+        // Arabic
+        patterns = ['arabic', 'العربية'];
+        if (voiceTypeLower === 'male') patterns.push('فهد');
+        if (voiceTypeLower === 'female') patterns.push('زينب');
+      } else if (langLower.startsWith('hi')) {
+        // Hindi
+        patterns = ['hindi', 'हिन्दी'];
+        if (voiceTypeLower === 'male') patterns.push('ashok', 'ravi');
+        if (voiceTypeLower === 'female') patterns.push('veena', 'anjali');
+      } else if (langLower.startsWith('en')) {
+        // English variants
+        if (langLower.includes('gb') || langLower.includes('uk')) {
+          patterns = ['british', 'uk', 'english'];
+        } else if (langLower.includes('us') || langLower.includes('america')) {
+          patterns = ['american', 'us english'];
+        } else {
+          patterns = ['english'];
+        }
+        if (voiceTypeLower === 'male') patterns.push('david', 'daniel');
+        if (voiceTypeLower === 'female') patterns.push('victoria', 'samantha');
+      } else {
+        // Default for other languages
+        patterns = [langLower.substring(0, 2)];
+      }
+
+      // Try to find a voice matching the patterns
+      for (const pattern of patterns) {
+        const match = voices.find(v => v.name.toLowerCase().includes(pattern) && v.lang.toLowerCase().startsWith(langLower.substring(0, 2)));
+        if (match) return match;
+      }
+
+      // Fallback: find any voice with the matching language prefix
+      const langPrefix = langLower.substring(0, 2);
+      const fallbackVoice = voices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
+      if (fallbackVoice) return fallbackVoice;
+
+      // Last resort: return first available voice
+      return voices[0];
+    } catch (e) {
+      return null;
+    }
+  };
+
   // Call backend API to fetch and summarize news
   const handleFetchAndSummarize = async () => {
     setLoading(true);
     setShowSummaryFade(false);
     const displayQuery = searchQuery.trim() || "top and most popular global headlines from major news sources";
+    const lang = detectLanguage(displayQuery);
+    setSummaryLang(lang);
     setSummary(`Fetching news about: ${displayQuery}. Please wait.`);
 
     try {
@@ -109,7 +211,8 @@ export default function Home() {
         body: JSON.stringify({ 
           query: searchQuery, 
           apiKey,
-          previousStories: previousStories
+          previousStories: previousStories,
+          language: lang
         }),
       });
 
@@ -160,38 +263,12 @@ export default function Home() {
       // Stop previous playback first
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-US";
+      utterance.lang = summaryLang || "en-US";
       
-      // Apply voice preference with improved detection
-      if (voiceType !== "default" && typeof window !== "undefined") {
-        try {
-          const voices = window.speechSynthesis.getVoices();
-          let selectedVoice = null;
-          
-          if (voiceType === "male") {
-            // Try multiple approaches to find a male voice - prioritize exact matches
-            selectedVoice = voices.find(v => v.name.toLowerCase() === 'google uk english male') ||
-                           voices.find(v => v.name.toLowerCase().includes('david')) ||
-                           voices.find(v => v.name.toLowerCase().includes('male')) ||
-                           voices.find(v => v.name.includes('US English') && !v.name.includes('Female')) ||
-                           voices[0]; // Fallback
-          } else if (voiceType === "female") {
-            selectedVoice = voices.find(v => v.name.toLowerCase() === 'google uk english female') ||
-                           voices.find(v => v.name.toLowerCase().includes('victoria')) ||
-                           voices.find(v => v.name.toLowerCase().includes('female')) ||
-                           voices[1] || voices[0];
-          } else if (voiceType === "neutral") {
-            selectedVoice = voices.find(v => v.name.toLowerCase().includes('samantha')) ||
-                           voices.find(v => v.name.toLowerCase().includes('google')) ||
-                           voices[0];
-          }
-          
-          if (selectedVoice) {
-            utterance.voice = selectedVoice;
-          }
-        } catch (e) {
-          // Silently fail voice selection if voices not available
-        }
+      // Select native speaker voice for the detected language
+      const selectedVoice = selectVoiceForLanguage(summaryLang, voiceType);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
       }
       
       // Adjust pitch and rate for pleasantness
@@ -202,43 +279,41 @@ export default function Home() {
   };
 
   // Advanced play/pause controls: keep a reference to the active utterance
-  const startSpeaking = (text, id) => {
+  const startSpeaking = (card, id) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     // Cancel any existing speech
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-US";
 
-    // Try to apply voice preference
-    if (voiceType !== "default" && typeof window !== "undefined") {
-      try {
-        const voices = window.speechSynthesis.getVoices();
-        let selectedVoice = null;
-        if (voiceType === "male") {
-          selectedVoice = voices.find(v => v.name.toLowerCase() === 'google uk english male') ||
-                         voices.find(v => v.name.toLowerCase().includes('david')) ||
-                         voices.find(v => v.name.toLowerCase().includes('male')) ||
-                         voices.find(v => v.name.includes('US English') && !v.name.includes('Female')) ||
-                         voices[0];
-        } else if (voiceType === "female") {
-          selectedVoice = voices.find(v => v.name.toLowerCase() === 'google uk english female') ||
-                         voices.find(v => v.name.toLowerCase().includes('victoria')) ||
-                         voices.find(v => v.name.toLowerCase().includes('female')) ||
-                         voices[1] || voices[0];
-        } else if (voiceType === "neutral") {
-          selectedVoice = voices.find(v => v.name.toLowerCase().includes('samantha')) ||
-                         voices.find(v => v.name.toLowerCase().includes('google')) ||
-                         voices[0];
-        }
-        if (selectedVoice) u.voice = selectedVoice;
-      } catch (e) {
-        // ignore
-      }
+    // card is expected to be an object with `headline` and `content`
+    const headline = (card && card.headline) ? String(card.headline).trim() : '';
+    const content = (card && card.content) ? String(card.content).trim() : '';
+
+    // Avoid repeating the headline if the content begins with the same text
+    let contentToRead = content;
+    if (headline && content && content.toLowerCase().startsWith(headline.toLowerCase())) {
+      contentToRead = content.slice(headline.length).trim();
+      // Remove leading punctuation left after slice
+      contentToRead = contentToRead.replace(/^[\s\-:—–\.]+/, '').trim();
+    }
+
+    // Use a different lead-in to the headline so it doesn't sound like a replay
+    const leadIn = headline ? `Top story: ${headline}.` : '';
+    const spokenText = `${leadIn}${contentToRead ? ' ' + contentToRead : ''}`.trim();
+
+    const u = new SpeechSynthesisUtterance(spokenText);
+    u.lang = summaryLang || "en-US";
+
+    // Select native speaker voice for the detected language
+    const selectedVoice = selectVoiceForLanguage(summaryLang, voiceType);
+    if (selectedVoice) {
+      u.voice = selectedVoice;
     }
 
     u.pitch = 1.2;
     u.rate = 0.95;
     u.onend = () => {
+      // Explicitly stop speech synthesis to prevent auto-replay
+      if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
       setCurrentPlayingId(null);
       setIsPaused(false);
       utteranceRef.current = null;
@@ -255,7 +330,7 @@ export default function Home() {
 
     // If clicking a different card, start speaking that card
     if (currentPlayingId !== card.id) {
-      startSpeaking(`${card.headline}. ${card.content}`, card.id);
+      startSpeaking(card, card.id);
       return;
     }
 
@@ -267,11 +342,11 @@ export default function Home() {
         setIsPaused(false);
         // If utterance was cleared for some reason, restart from beginning
         if (!utteranceRef.current) {
-          startSpeaking(`${card.headline}. ${card.content}`, card.id);
+          startSpeaking(card, card.id);
         }
       } catch (e) {
         // Fall back to restarting if resume fails
-        startSpeaking(`${card.headline}. ${card.content}`, card.id);
+        startSpeaking(card, card.id);
       }
     } else {
       // Pause current speech

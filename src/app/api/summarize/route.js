@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
-  const { query, apiKey: clientApiKey, previousStories = [] } = await request.json();
+  const { query, apiKey: clientApiKey, previousStories = [], language } = await request.json();
   const apiKey = '7a12d1d7f81c4792aefc00d2f6033f78.colo5oAdAXtydx0t'; // clientApiKey || process.env.ZHIPU_API_KEY;
 
   if (!apiKey) {
@@ -16,6 +16,8 @@ export async function POST(request) {
     ? `\n\nIMPORTANT: Do NOT include these previously shown stories: ${previousStories.join("; ")}. Provide fresh, new stories instead.`
     : "";
 
+  const languageTag = language || 'en-US';
+
   try {
     const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
       method: "POST",
@@ -28,7 +30,7 @@ export async function POST(request) {
         messages: [
           {
             role: "system",
-            content: "You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 current news items related to that query, and provide a concise one-sentence summary for each news item. Reply in English. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources." + exclusionNote
+            content: `You are a news summarization assistant specifically designed to serve people with visual impairments. Based on the search query provided by the user, search and list the top 3 current news items related to that query, and provide a concise one-sentence summary for each news item. Start summarizing directly without any introduction. If no specific query is provided, provide the top global headlines from the most reliable and major news sources.\n\nReply in the language indicated by the BCP-47 tag: ${languageTag}.` + exclusionNote
           },
           {
             role: "user",
